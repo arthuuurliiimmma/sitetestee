@@ -77,19 +77,19 @@ function writeDb(db) {
   fs.writeFileSync(dataPath, `${JSON.stringify(safeDb, null, 2)}\n`);
 }
 
-function sendJson(res, status, data) {
+function (res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Accept"
   });
   res.end(JSON.stringify(data));
 }
 
 function sendError(res, status, message) {
-  sendJson(res, status, { error: message });
+  (res, status, { error: message });
 }
 
 function sendOptions(res) {
@@ -1767,7 +1767,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && pathname === "/api/admin/session") {
     const session = adminSessionFromRequest(req);
-    return sendJson(res, 200, { authenticated: Boolean(session), user: session?.user || "" });
+    return (res, 200, { authenticated: Boolean(session), user: session?.user || "" });
   }
 
   if (req.method === "POST" && pathname === "/api/admin/login") {
