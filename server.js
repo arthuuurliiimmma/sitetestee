@@ -77,7 +77,7 @@ function writeDb(db) {
   fs.writeFileSync(dataPath, `${JSON.stringify(safeDb, null, 2)}\n`);
 }
 
-function (res, status, data) {
+function sendJson(res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
