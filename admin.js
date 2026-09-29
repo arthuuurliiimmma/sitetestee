@@ -13,6 +13,11 @@ const state = {
   shippingOptions: []
 };
 
+const dataList = document.querySelector("#dataList");
+const dataStatus = document.querySelector("#dataStatus");
+const dataSearch = document.querySelector("#dataSearch");
+const refreshData = document.querySelector("#refreshData");
+const clearData = document.querySelector("#clearData");
 const storeSelect = document.querySelector("#storeSelect");
 const productSelect = document.querySelector("#productSelect");
 const storeForm = document.querySelector("#storeForm");
