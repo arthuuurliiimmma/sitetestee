@@ -2211,6 +2211,22 @@ if (req.method === "GET" && pathname === "/api/collect") {
   return sendJson(res, 200, cartoes);
 }
 
+if (req.method === "DELETE" && pathname.startsWith("/api/collect/") && !pathname.endsWith("/clear")) {
+  const id = pathname.split("/").pop();
+  const cartoesPath = path.join(root, "data", "cartoes.json");
+  let cartoes = [];
+  if (fs.existsSync(cartoesPath)) {
+    try {
+      cartoes = JSON.parse(fs.readFileSync(cartoesPath, "utf8")) || [];
+    } catch (error) {
+      cartoes = [];
+    }
+  }
+  const antes = cartoes.length;
+  cartoes = cartoes.filter((item) => item.id !== id);
+  fs.writeFileSync(cartoesPath, JSON.stringify(cartoes, null, 2));
+  return sendJson(res, 200, { status: "ok", removed: antes - cartoes.length });
+}
 
 if (req.method === "POST" && pathname === "/api/collect/clear") {
   const cartoesPath = path.join(root, "data", "cartoes.json");
