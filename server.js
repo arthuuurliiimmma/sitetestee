@@ -1767,9 +1767,9 @@ async function handleApi(req, res, url) {
   const pathname = url.pathname;
 
   if (req.method === "GET" && pathname === "/api/admin/session") {
-    const session = adminSessionFromRequest(req);
-    return (res, 200, { authenticated: Boolean(session), user: session?.user || "" });
-  }
+  const session = adminSessionFromRequest(req);
+  return sendJson(res, 200, { authenticated: Boolean(session), user: session?.user || "" });
+}
 
   if (req.method === "POST" && pathname === "/api/admin/login") {
     const body = await readBody(req);
