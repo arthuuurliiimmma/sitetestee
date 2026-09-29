@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>WPink Checkout - Painel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="admin-body">
+    <div class="admin-boot" id="adminStatus">Carregando painel...</div>
+    <section class="admin-login" id="adminLogin">
+      <form class="admin-login__box" id="loginForm">
+        <img class="admin-login__logo" src="./assets/wpink-logo.avif" alt="wpink" />
+        <h1>Acesso ao painel</h1>
+        <label>
+          Usuário
+          <input name="user" autocomplete="username" value="admin" />
+        </label>
+        <label>
+          Senha
+          <input name="password" type="password" autocomplete="current-password" placeholder="Senha" />
+        </label>
+        <button class="button" type="submit">Entrar</button>
+        <span class="admin-login__error" id="loginError"></span>
+      </form>
+    </section>
+
+    <main class="admin-shell is-locked" id="adminShell">
+      <aside class="admin-sidebar">
+        <img class="admin-logo" src="./assets/wpink-logo.avif" alt="wpink" />
+        <nav class="admin-nav">
+          <a href="#dashboard" data-admin-nav="dashboard">Dashboard</a>
+          <a href="#store" data-admin-nav="store">Loja</a>
+          <a href="#shipping" data-admin-nav="shipping">Frete</a>
+          <a href="#product" data-admin-nav="product">Produtos</a>
+          <a href="#orders" data-admin-nav="orders">Pedidos</a>
+          <a href="#data" data-admin-nav="data">Dados</a>
+        </nav>
+      </aside>
+
+      <section class="admin-main">
+        <header class="admin-header">
+          <div>
+            <h1 id="adminPageTitle">Dashboard</h1>
+            <p id="adminPageSubtitle">Acompanhe vendas, pendências e operação do checkout.</p>
+          </div>
+          <div class="admin-header-actions">
+            <a class="admin-open-checkout" id="checkoutLink" href="./index.html?store=wpink" target="_blank" rel="noreferrer">Abrir checkout</a>
+            <button class="admin-refresh" id="logoutButton" type="button">Sair</button>
+          </div>
+        </header>
+
+        <section id="dashboard" class="admin-section" data-admin-view="dashboard">
+          <div class="admin-cards">
+            <div class="admin-card">
+              <span>Vendas pagas</span>
+              <strong id="paidTotal">R$ 0,00</strong>
+              <small id="paidOrders">0 pedidos</small>
+            </div>
+            <div class="admin-card">
+              <span>Pendentes</span>
+              <strong id="pendingTotal">R$ 0,00</strong>
+              <small id="pendingOrders">0 pedidos</small>
+            </div>
+            <div class="admin-card">
+              <span>Lojas</span>
+              <strong id="storeCount">0</strong>
+              <small id="productCount">0 produtos</small>
+            </div>
+            <div class="admin-card">
+              <span>Hoje</span>
+              <strong id="todayTotal">R$ 0,00</strong>
+              <small id="todayOrders">0 pedidos</small>
+            </div>
+            <div class="admin-card">
+              <span>Total de pedidos</span>
+              <strong id="orderCount">0</strong>
+              <small id="averagePaidTicket">Ticket R$ 0,00</small>
+            </div>
+          </div>
+
+          <div class="admin-dashboard-grid">
+            <article class="admin-info-panel">
+              <strong>Status da operação</strong>
+              <span>Use esta tela para acompanhar o básico e entre nas abas laterais para configurar cada área.</span>
+            </article>
+            <article class="admin-info-panel">
+              <strong>Próximos passos</strong>
+              <span>Finalize domínio fixo, gateway ativa e integração Shopify antes de instalar no tema.</span>
+            </article>
+          </div>
+        </section>
+
+        <section id="store" class="admin-section admin-panel" data-admin-view="store">
+          <div class="admin-section__head">
+            <div>
+              <h2>Loja e domínio</h2>
+              <span class="admin-sync-status">Configuração principal do checkout externo.</span>
+            </div>
+            <select id="storeSelect"></select>
+          </div>
+
+          <form id="storeForm" class="admin-form">
+            <input name="id" type="hidden" />
+            <div class="admin-config-grid">
+              <section class="admin-config-card">
+                <h3>Checkout</h3>
+                <div class="admin-grid">
+                  <label>
+                    Nome da loja
+                    <input name="name" placeholder="WPink" required />
+                  </label>
+                  <label>
+                    Slug
+                    <input name="slug" placeholder="wpink" required />
+                  </label>
+                </div>
+                <label>
+                  Domínio do checkout
+                  <input name="checkoutDomain" placeholder="pagamento.wpink.com.br" />
+                </label>
+                <label>
+                  Depois de finalizar
+                  <select name="redirectMode">
+                    <option value="checkout">Enviar para checkout Shopify</option>
+                    <option value="cart">Enviar para carrinho Shopify</option>
+                    <option value="">Nao redirecionar automaticamente</option>
+                  </select>
+                </label>
+              </section>
+
+              <section class="admin-config-card">
+                <h3>Shopify</h3>
+                <label>
+                  Domínio Shopify
+                  <input name="shopifyDomain" placeholder="wpink.myshopify.com" />
+                </label>
+                <label>
+                  Client ID Shopify
+                  <input name="shopifyClientId" autocomplete="off" placeholder="Client ID do Dev Dashboard" />
+                </label>
+                <div class="admin-grid">
+                  <label>
+                    Client secret Shopify
+                    <input name="shopifyClientSecret" type="password" autocomplete="off" placeholder="shpss_..." />
+                  </label>
+                  <label>
+                    Token Admin API Shopify
+                    <input name="shopifyAccessToken" type="password" autocomplete="off" placeholder="Opcional / legado" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="admin-config-card">
+                <h3>Pagamentos</h3>
+                <label>
+                  Gateway ativa
+                  <select name="activeGateway">
+                    <option value="manual">Manual / teste</option>
+                    <option value="blackcat">BlackCat</option>
+                    <option value="paradise">ParadisePag</option>
+                  </select>
+                </label>
+                <div class="admin-grid">
+                  <label>
+                    Chave API BlackCat
+                    <input name="blackcatApiKey" type="password" autocomplete="off" placeholder="X-API-Key BlackCat" />
+                  </label>
+                  <label>
+                    Chave secreta ParadisePag
+                    <input name="paradiseApiKey" type="password" autocomplete="off" placeholder="sk_..." />
+                  </label>
+                </div>
+              </section>
+
+              <section class="admin-config-card">
+                <h3>Publicação</h3>
+                <div class="admin-dns-box">
+                  <strong>Webhooks de pagamento</strong>
+                  <span>BlackCat: <code id="blackcatWebhookUrl"></code></span>
+                  <span>ParadisePag: <code id="paradiseWebhookUrl"></code></span>
+                </div>
+                <div class="admin-dns-box">
+                  <strong>DNS para apontar o domínio</strong>
+                  <span>Tipo: CNAME</span>
+                  <span>Nome: pagamento</span>
+                  <span>Valor: <code id="dnsTarget">checkout.wpcheckout.com</code></span>
+                </div>
+                <div class="admin-dns-box">
+                  <strong>Integração com tema Shopify</strong>
+                  <span id="themeInstallStatus">Ainda não instalado.</span>
+                </div>
+              </section>
+            </div>
+            <div class="admin-form-actions">
+              <button class="button" type="submit">Salvar loja</button>
+              <button class="admin-refresh" id="testShopifyToken" type="button">Testar token</button>
+              <button class="admin-refresh" id="testGateway" type="button">Testar gateway</button>
+              <button class="admin-refresh" id="installTheme" type="button">Instalar tema</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="shipping" class="admin-section admin-panel" data-admin-view="shipping">
+          <div class="admin-section__head">
+            <div>
+              <h2>Frete</h2>
+              <span class="admin-sync-status">Cadastre as opções personalizadas que aparecem no checkout.</span>
+            </div>
+            <button class="admin-refresh" id="addShippingOption" type="button">Adicionar frete</button>
+          </div>
+
+          <div class="admin-config-card">
+            <h3>Opções de entrega</h3>
+            <div class="admin-shipping-list" id="shippingOptionsList"></div>
+            <div class="admin-form-actions admin-form-actions--shipping">
+              <button class="button" id="saveShippingOptions" type="button">Salvar fretes</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="product" class="admin-section admin-panel" data-admin-view="product">
+          <div class="admin-section__head">
+            <div>
+              <h2>Produtos</h2>
+              <span class="admin-sync-status" id="syncStatus"></span>
+            </div>
+            <div class="admin-actions">
+              <button class="admin-refresh" id="syncShopify" type="button">Sincronizar Shopify</button>
+              <label class="admin-file-button">
+                Importar CSV
+                <input id="csvInput" type="file" accept=".csv,text/csv" />
+              </label>
+              <select class="admin-product-select" id="productSelect"></select>
+            </div>
+          </div>
+
+          <div class="admin-product-layout">
+            <div class="admin-list-panel">
+              <div class="admin-product-toolbar">
+                <label>
+                  Buscar produto
+                  <input id="productSearch" placeholder="Nome, SKU ou Variant ID" />
+                </label>
+                <label>
+                  Visualizar
+                  <select id="productSourceFilter">
+                    <option value="operational">Produtos principais</option>
+                    <option value="shopify">Somente Shopify</option>
+                    <option value="csv">CSV backup</option>
+                    <option value="all">Todos</option>
+                  </select>
+                </label>
+              </div>
+              <div class="admin-product-list" id="productList"></div>
+            </div>
+
+            <form id="productForm" class="admin-form admin-editor-panel">
+              <input name="id" type="hidden" />
+              <input name="storeId" type="hidden" />
+              <h3>Produto selecionado</h3>
+              <div class="admin-link-row">
+                <label>
+                  Link do checkout
+                  <input id="productCheckoutLink" readonly />
+                </label>
+                <button class="admin-refresh" id="copyProductLink" type="button">Copiar</button>
+              </div>
+              <label>
+                Nome do produto
+                <input name="name" required />
+              </label>
+              <label>
+                Slug do produto
+                <input name="slug" placeholder="cabelos-e-unhas" />
+              </label>
+              <div class="admin-grid">
+                <label>
+                  Preço
+                  <input name="price" inputmode="decimal" required />
+                </label>
+                <label>
+                  Preço antigo
+                  <input name="compareAt" inputmode="decimal" />
+                </label>
+              </div>
+              <label>
+                ID da variante Shopify
+                <input name="variantId" inputmode="numeric" />
+              </label>
+              <label>
+                Imagem
+                <input name="image" />
+              </label>
+              <button class="button" type="submit">Salvar produto</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="orders" class="admin-section admin-panel" data-admin-view="orders">
+          <div class="admin-section__head">
+            <div>
+              <h2>Pedidos</h2>
+              <span class="admin-sync-status" id="ordersStatus">Acompanhamento dos pedidos do checkout.</span>
+            </div>
+            <div class="admin-actions">
+              <select id="orderStatusFilter">
+                <option value="all">Todos</option>
+                <option value="pending">Pendentes</option>
+                <option value="paid">Pagos</option>
+                <option value="cancelled">Cancelados</option>
+              </select>
+              <button class="admin-refresh" id="refreshOrders" type="button">Atualizar</button>
+              <button class="admin-refresh admin-danger" id="clearOrders" type="button">Limpar dados</button>
+            </div>
+          </div>
+          <div class="admin-order-toolbar">
+            <label>
+              Buscar pedido
+              <input id="orderSearch" placeholder="Cliente, e-mail, CPF, telefone ou produto" />
+            </label>
+          </div>
+          <div class="admin-orders-layout">
+            <div class="admin-list-panel">
+              <div class="admin-orders" id="ordersList"></div>
+            </div>
+            <div class="admin-order-detail is-hidden" id="orderDetail"></div>
+          </div>
+        </section>
+
+        <section id="data" class="admin-section admin-panel" data-admin-view="data" aria-label="Dados"></section>
+      </section>
+    </main>
+    <script src="./admin.js"></script>
+  </body>
+</html>

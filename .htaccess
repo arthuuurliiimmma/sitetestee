@@ -1,0 +1,11 @@
+Options -Indexes
+DirectoryIndex index.html
+
+<FilesMatch "^(server\.js|package\.json|HOSTINGER-INSTRUCOES\.txt)$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^data/ - [F,L]
+</IfModule>
