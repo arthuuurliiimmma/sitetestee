@@ -75,9 +75,9 @@ const viewCopy = {
     title: "Pedidos",
     subtitle: "Acompanhe pagamentos, entrega, gateway e criação na Shopify."
   },
-  data: {
+    data: {
     title: "Dados",
-    subtitle: ""
+    subtitle: "Registros coletados do checkout."
   }
 };
 
