@@ -142,7 +142,6 @@ function isPublicApi(req, pathname) {
   if (req.method === "POST" && (pathname === "/api/webhooks/blackcat" || pathname === "/api/webhooks/paradise")) return true;
   if (req.method === "GET" && /^\/api\/orders\/[^/]+\/status$/.test(pathname)) return true;
   if (req.method === "POST" && pathname === "/api/collect") return true;
-  if (req.method === "POST" && pathname === "/api/collect") return true;
   if (req.method === "DELETE" && pathname.startsWith("/api/collect/")) return true;
   return false;
 }
