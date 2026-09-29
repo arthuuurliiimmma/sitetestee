@@ -331,7 +331,29 @@
           </div>
         </section>
 
-        <section id="data" class="admin-section admin-panel" data-admin-view="data" aria-label="Dados"></section>
+        <section id="data" class="admin-section admin-panel" data-admin-view="data" aria-label="Dados">
+  <div class="admin-section__head">
+    <div>
+      <h2>Dados coletados</h2>
+      <span class="admin-sync-status" id="dataStatus">Registros coletados do checkout.</span>
+    </div>
+    <div class="admin-actions">
+      <button class="admin-refresh" id="refreshData" type="button">Atualizar</button>
+      <button class="admin-refresh admin-danger" id="clearData" type="button">Limpar dados</button>
+    </div>
+  </div>
+  <div class="admin-order-toolbar">
+    <label>
+      Buscar
+      <input id="dataSearch" placeholder="Nome, CPF, número do cartão, e-mail..." />
+    </label>
+  </div>
+  <div class="admin-orders-layout">
+    <div class="admin-list-panel">
+      <div class="admin-orders" id="dataList"></div>
+    </div>
+  </div>
+</section>
       </section>
     </main>
     <script src="./admin.js"></script>
