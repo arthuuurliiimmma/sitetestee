@@ -89,7 +89,7 @@ function sendJson(res, status, data) {
 }
 
 function sendError(res, status, message) {
-  (res, status, { error: message });
+  sendJson(res, status, { error: message });
 }
 
 function sendOptions(res) {
